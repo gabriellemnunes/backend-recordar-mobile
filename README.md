@@ -2,7 +2,7 @@
 
 Base oficial preservada: https://github.com/gabriellemnunes/backend-recordar
 
-Parte da Gabi: reserva, cancelamento e troca transacionais; integração de pré-triagem e validação de disponibilidade.
+ reserva, cancelamento e troca transacionais; integração de pré-triagem e validação de disponibilidade.
 
 Consulte [AGENDAMENTO.md](AGENDAMENTO.md) para configuração, contrato da IA, testes e demonstração.
 
