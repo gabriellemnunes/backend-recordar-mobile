@@ -1,0 +1,1482 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Recordar API",
+    "version": "4.2.0",
+    "description": "API acadêmica da plataforma Recordar: clínicas, especialidades, médicos, pacientes, consultas e remédios. Extensão mobile: agendamento vinculado à pré-triagem persistida, com troca e cancelamento transacionais."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "PacienteInput": {
+        "type": "object",
+        "required": [
+          "tipo",
+          "nome_paciente",
+          "data_nascimento",
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "paciente"
+            ]
+          },
+          "nome_paciente": {
+            "type": "string"
+          },
+          "data_nascimento": {
+            "type": "string",
+            "example": "1953-03-12"
+          },
+          "telefone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "senha": {
+            "type": "string"
+          },
+          "confirmar_senha": {
+            "type": "string"
+          }
+        }
+      },
+      "MedicoInput": {
+        "type": "object",
+        "required": [
+          "nome_medico",
+          "crm",
+          "id_especialidade",
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "nome_medico": {
+            "type": "string"
+          },
+          "crm": {
+            "type": "string"
+          },
+          "id_especialidade": {
+            "type": "string",
+            "description": "ID de uma especialidade cadastrada"
+          },
+          "clinicas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IDs das clínicas onde atende"
+          },
+          "telefone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "senha": {
+            "type": "string"
+          },
+          "confirmar_senha": {
+            "type": "string"
+          }
+        }
+      },
+      "ClinicaInput": {
+        "type": "object",
+        "required": [
+          "nome_clinica"
+        ],
+        "properties": {
+          "nome_clinica": {
+            "type": "string",
+            "example": "Clínica Vida"
+          },
+          "endereco_clinica": {
+            "type": "string",
+            "example": "Rua das Flores, 120 - Centro"
+          },
+          "telefone_clinica": {
+            "type": "string",
+            "example": "(11) 3000-1000"
+          }
+        }
+      },
+      "Anamnese": {
+        "type": "object",
+        "required": [
+          "queixa_principal"
+        ],
+        "properties": {
+          "queixa_principal": {
+            "type": "string"
+          },
+          "sintomas": {
+            "type": "string"
+          },
+          "inicio_sintomas": {
+            "type": "string",
+            "example": "2026-09-28"
+          }
+        }
+      },
+      "AnamneseGeral": {
+        "type": "object",
+        "properties": {
+          "condicoes_saude": {
+            "type": "string"
+          },
+          "alergias": {
+            "type": "string"
+          },
+          "medicamentos_em_uso": {
+            "type": "string"
+          }
+        }
+      },
+      "AdministradorInput": {
+        "type": "object",
+        "required": [
+          "tipo",
+          "nome_administrador",
+          "email",
+          "senha"
+        ],
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "administrador"
+            ]
+          },
+          "nome_administrador": {
+            "type": "string"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "(81) 98888-7777"
+          },
+          "email": {
+            "type": "string"
+          },
+          "senha": {
+            "type": "string"
+          },
+          "confirmar_senha": {
+            "type": "string"
+          }
+        }
+      },
+      "AgendamentoMobileInput": {
+        "type": "object",
+        "properties": {
+          "id_pre_triagem": {
+            "type": "string",
+            "description": "ID de pré-triagem concluída do paciente, não urgente."
+          },
+          "queixa_principal": {
+            "type": "string",
+            "description": "Obrigatória no agendamento direto; usa resumo persistido se omitida com pré-triagem."
+          },
+          "sintomas": {
+            "type": "string"
+          },
+          "inicio_sintomas": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cria conta de paciente e já devolve o token (médicos são cadastrados pelo administrador)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PacienteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conta criada"
+          },
+          "403": {
+            "description": "Só pacientes criam a própria conta"
+          },
+          "409": {
+            "description": "E-mail já cadastrado"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Realiza login. O aplicativo envia o tipo da aba escolhida (paciente, medico ou administrador)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "senha"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "senha": {
+                    "type": "string"
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "paciente",
+                      "medico",
+                      "administrador"
+                    ],
+                    "description": "Opcional. Recusa o login se a conta for de outro tipo."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login realizado"
+          },
+          "401": {
+            "description": "E-mail ou senha inválidos"
+          }
+        }
+      }
+    },
+    "/api/auth/recuperar-senha": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cria uma nova senha conferindo um dado do cadastro (paciente informa data_nascimento, médico informa crm)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tipo",
+                  "email",
+                  "nova_senha"
+                ],
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": [
+                      "paciente",
+                      "medico"
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "data_nascimento": {
+                    "type": "string",
+                    "example": "1953-03-12",
+                    "description": "Obrigatório para paciente"
+                  },
+                  "crm": {
+                    "type": "string",
+                    "description": "Obrigatório para médico"
+                  },
+                  "nova_senha": {
+                    "type": "string"
+                  },
+                  "confirmar_senha": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Senha alterada"
+          },
+          "400": {
+            "description": "Dados não conferem ou senha inválida"
+          }
+        }
+      }
+    },
+    "/api/remedios/{id}/tomar": {
+      "put": {
+        "tags": [
+          "Remédios"
+        ],
+        "summary": "Paciente marca ou desmarca o remédio como tomado em um dia (hoje, se dia não for enviado). Só vale dentro do período do remédio",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tomado": {
+                    "type": "boolean",
+                    "example": true
+                  },
+                  "dia": {
+                    "type": "string",
+                    "example": "2026-10-10",
+                    "description": "Opcional. Padrão: hoje"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Remédio atualizado, com tomado_hoje"
+          },
+          "400": {
+            "description": "Dia inválido ou fora do período do remédio"
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Dados da própria conta (Perfil)",
+        "responses": {
+          "200": {
+            "description": "Dados do usuário",
+            "sem senha": null
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Edita a própria conta",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome_paciente": {
+                    "type": "string"
+                  },
+                  "nome_medico": {
+                    "type": "string"
+                  },
+                  "data_nascimento": {
+                    "type": "string",
+                    "example": "1953-03-12"
+                  },
+                  "telefone": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "crm": {
+                    "type": "string"
+                  },
+                  "id_especialidade": {
+                    "type": "string",
+                    "description": "ID da especialidade (médico)"
+                  },
+                  "clinicas": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "IDs das clínicas onde atende (médico)"
+                  },
+                  "senha": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conta atualizada"
+          }
+        },
+        "description": "Paciente também pode enviar a anamnese geral: condicoes_saude, alergias e medicamentos_em_uso."
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Deleta a própria conta (paciente ou médico) e tudo que depende dela",
+        "responses": {
+          "200": {
+            "description": "Conta deletada"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Lista pacientes, médicos ou administradores (administrador)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tipo",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "paciente",
+                "medico",
+                "administrador"
+              ]
+            },
+            "description": "Sem tipo, lista pacientes e médicos"
+          },
+          {
+            "in": "query",
+            "name": "busca",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Parte do nome"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de usuários"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Administrador cadastra um médico ou outro administrador (tipo: administrador)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/MedicoInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AdministradorInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Médico ou administrador cadastrado"
+          },
+          "400": {
+            "description": "Dado faltando ou inválido"
+          },
+          "409": {
+            "description": "E-mail já cadastrado"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Detalhe de um usuário (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuário encontrado"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Edita o cadastro de um paciente ou médico, inclusive especialidade e clínicas (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome_paciente": {
+                    "type": "string"
+                  },
+                  "nome_medico": {
+                    "type": "string"
+                  },
+                  "telefone": {
+                    "type": "string"
+                  },
+                  "crm": {
+                    "type": "string"
+                  },
+                  "id_especialidade": {
+                    "type": "string"
+                  },
+                  "clinicas": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cadastro atualizado"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Apaga um paciente, médico ou outro administrador (não apaga a própria conta)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuário deletado"
+          }
+        }
+      }
+    },
+    "/api/consultas": {
+      "get": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Lista consultas (paciente vê as que marcou, médico vê as dele, administrador vê todas)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "disponivel",
+                "agendada"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de consultas"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Médico cria um ou vários horários de consulta no mesmo dia",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id_clinica",
+                  "data_consulta",
+                  "horarios"
+                ],
+                "properties": {
+                  "id_clinica": {
+                    "type": "string",
+                    "description": "Uma das clínicas do médico"
+                  },
+                  "data_consulta": {
+                    "type": "string",
+                    "example": "2026-10-20"
+                  },
+                  "horarios": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "08:00",
+                      "08:30",
+                      "09:00"
+                    ],
+                    "description": "Horários que ficam disponíveis. Os que já existem são ignorados."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Horários criados (consultas e horarios_repetidos)"
+          },
+          "400": {
+            "description": "Dado faltando ou inválido"
+          },
+          "409": {
+            "description": "Todos os horários enviados já existiam"
+          }
+        }
+      }
+    },
+    "/api/consultas/disponiveis": {
+      "get": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Dias e horários livres para o paciente marcar",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "clinica",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID da clínica"
+          },
+          {
+            "in": "query",
+            "name": "especialidade",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID da especialidade"
+          },
+          {
+            "in": "query",
+            "name": "medico",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID do médico"
+          },
+          {
+            "in": "query",
+            "name": "data",
+            "schema": {
+              "type": "string"
+            },
+            "description": "AAAA-MM-DD"
+          },
+          {
+            "in": "query",
+            "name": "id_pre_triagem",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filtra pelas especialidades recomendadas no resultado persistido da IA."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de consultas disponíveis"
+          }
+        }
+      }
+    },
+    "/api/consultas/meus-pacientes": {
+      "get": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Pacientes do médico logado: os com consulta agendada e, depois, os sem consulta agendada que ainda têm algum remédio dele que não terminou (id_consulta null). Saem da lista quando a data final de todos os remédios passa. Cada item traz total_remedios e remedios_ativos",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "busca",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de pacientes"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}": {
+      "get": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Detalhe da consulta (com anamnese para paciente e médico da consulta)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta encontrada"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Exclui a consulta e os remédios dela (médico dono ou administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta excluída"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}/agendar": {
+      "put": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Paciente marca a consulta enviando a anamnese da consulta",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgendamentoMobileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consulta agendada"
+          },
+          "409": {
+            "description": "Horário ocupado, passado ou conflitante"
+          },
+          "422": {
+            "description": "Pré-triagem urgente ou especialidade incompatível"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}/trocar": {
+      "put": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Paciente troca o horário da consulta por outro horário livre do mesmo médico",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id_nova"
+                ],
+                "properties": {
+                  "id_nova": {
+                    "type": "string",
+                    "description": "ID do horário livre escolhido"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Horário trocado; a anamnese e os remédios acompanham a consulta e o médico recebe um aviso"
+          },
+          "404": {
+            "description": "Consulta não encontrada"
+          },
+          "409": {
+            "description": "Horário não está mais disponível"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}/aviso-visto": {
+      "put": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Médico marca como visto o aviso de troca de horário",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aviso marcado como visto"
+          },
+          "404": {
+            "description": "Consulta não encontrada"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}/realizada": {
+      "put": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Médico marca a consulta agendada como realizada (a consulta é apagada; os remédios continuam com o paciente)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta realizada"
+          },
+          "400": {
+            "description": "A consulta não está agendada"
+          },
+          "404": {
+            "description": "Consulta não encontrada"
+          }
+        }
+      }
+    },
+    "/api/consultas/{id}/cancelar": {
+      "put": {
+        "tags": [
+          "Consultas"
+        ],
+        "summary": "Cancela a consulta (ela volta a ficar disponível e os remédios dela são apagados)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta cancelada"
+          }
+        }
+      }
+    },
+    "/api/remedios": {
+      "get": {
+        "tags": [
+          "Remédios"
+        ],
+        "summary": "Lista remédios (paciente vê os dele, médico vê os que receitou, administrador vê todos). Com ?dia= devolve só os que estão no período de uso nesse dia (Agenda do dia). O médico pode usar ?paciente= para ver todos os remédios que receitou para um paciente, inclusive de consultas já realizadas",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "consulta",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paciente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dia",
+            "description": "AAAA-MM-DD. Filtra os remédios em uso nesse dia; tomado_hoje passa a valer para esse dia",
+            "schema": {
+              "type": "string",
+              "example": "2026-10-10"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de remédios por horário"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Remédios"
+        ],
+        "summary": "Médico receita um remédio em uma consulta agendada, com o período de uso (data_inicio e data_fim)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id_consulta",
+                  "nome_remedio",
+                  "horario_remedio",
+                  "quantidade_remedio",
+                  "data_inicio",
+                  "data_fim"
+                ],
+                "properties": {
+                  "id_consulta": {
+                    "type": "string"
+                  },
+                  "nome_remedio": {
+                    "type": "string",
+                    "example": "Losartana 50 mg"
+                  },
+                  "horario_remedio": {
+                    "type": "string",
+                    "example": "09:00"
+                  },
+                  "quantidade_remedio": {
+                    "type": "string",
+                    "example": "1 comprimido"
+                  },
+                  "data_inicio": {
+                    "type": "string",
+                    "example": "2026-10-10",
+                    "description": "Primeiro dia em que o paciente toma o remédio"
+                  },
+                  "data_fim": {
+                    "type": "string",
+                    "example": "2026-10-12",
+                    "description": "Último dia em que o paciente toma o remédio (não pode ser antes de data_inicio)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Remédio criado"
+          }
+        }
+      }
+    },
+    "/api/remedios/{id}": {
+      "put": {
+        "tags": [
+          "Remédios"
+        ],
+        "summary": "Médico edita um remédio que receitou",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome_remedio": {
+                    "type": "string"
+                  },
+                  "horario_remedio": {
+                    "type": "string"
+                  },
+                  "quantidade_remedio": {
+                    "type": "string"
+                  },
+                  "data_inicio": {
+                    "type": "string",
+                    "example": "2026-10-10"
+                  },
+                  "data_fim": {
+                    "type": "string",
+                    "example": "2026-10-15"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Remédio atualizado"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Remédios"
+        ],
+        "summary": "Exclui um remédio (médico que receitou ou administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Remédio excluído"
+          }
+        }
+      }
+    },
+    "/api/clinicas": {
+      "get": {
+        "tags": [
+          "Clínicas"
+        ],
+        "summary": "Lista e pesquisa clínicas (aberta)",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "busca",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Parte do nome ou do endereço"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clínicas"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Clínicas"
+        ],
+        "summary": "Cadastra clínica (administrador)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClinicaInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Clínica cadastrada"
+          },
+          "409": {
+            "description": "Já existe uma clínica com esse nome"
+          }
+        }
+      }
+    },
+    "/api/clinicas/{id}": {
+      "get": {
+        "tags": [
+          "Clínicas"
+        ],
+        "summary": "Consulta uma clínica (aberta)",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clínica encontrada"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Clínicas"
+        ],
+        "summary": "Edita clínica (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClinicaInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Clínica atualizada"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Clínicas"
+        ],
+        "summary": "Exclui clínica sem médicos associados e sem consultas (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clínica excluída"
+          },
+          "409": {
+            "description": "Clínica em uso"
+          }
+        }
+      }
+    },
+    "/api/especialidades": {
+      "get": {
+        "tags": [
+          "Especialidades"
+        ],
+        "summary": "Lista especialidades (aberta)",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "busca",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de especialidades"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Especialidades"
+        ],
+        "summary": "Cadastra especialidade (administrador)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nome_especialidade"
+                ],
+                "properties": {
+                  "nome_especialidade": {
+                    "type": "string",
+                    "example": "Cardiologia"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Especialidade cadastrada"
+          },
+          "409": {
+            "description": "Especialidade já cadastrada"
+          }
+        }
+      }
+    },
+    "/api/especialidades/{id}": {
+      "put": {
+        "tags": [
+          "Especialidades"
+        ],
+        "summary": "Edita especialidade (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome_especialidade": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Especialidade atualizada"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Especialidades"
+        ],
+        "summary": "Exclui especialidade que nenhum médico usa (administrador)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Especialidade excluída"
+          },
+          "409": {
+            "description": "Especialidade em uso"
+          }
+        }
+      }
+    },
+    "/api/medicos": {
+      "get": {
+        "tags": [
+          "Médicos"
+        ],
+        "summary": "Consulta profissionais por nome, clínica ou especialidade (qualquer usuário logado)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "nome",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "clinica",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID da clínica"
+          },
+          {
+            "in": "query",
+            "name": "especialidade",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID da especialidade"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de médicos com especialidade e clínicas"
+          }
+        }
+      }
+    },
+    "/api/pre-triagens": {
+      "get": {
+        "tags": [
+          "Agendamento mobile"
+        ],
+        "summary": "Pré-triagens concluídas do paciente autenticado",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista privada com IDs, resumo, urgência, especialidades populadas e data de criação; até 50 itens."
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "403": {
+            "description": "Somente paciente"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}
