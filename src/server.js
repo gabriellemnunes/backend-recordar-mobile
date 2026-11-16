@@ -9,7 +9,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const swaggerUi = require("swagger-ui-express");
-const swaggerSpec = require("./config/swagger");
+const swaggerSpec = require("./config/swaggerMobile")(require("./config/swagger"));
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -33,14 +33,7 @@ app.get("/api", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/consultas", consultaRoutes);
-const { authenticate, authorize } = require('./middlewares/authMiddleware');
-const h = require('./middlewares/asyncHandler');
-const PreTriage = require('./models/PreTriage');
-app.get('/api/pre-triagens', authenticate, authorize('paciente'), h(async (req, res) => {
-  const itens = await PreTriage.find({ paciente: req.user.id, concluida: true })
-    .select('_id resumo urgencia especialidades createdAt').populate('especialidades').sort({ createdAt: -1 }).limit(50);
-  res.json(itens);
-}));
+app.use("/api/pre-triagens", require("./routes/preTriagemRoutes"));
 app.use("/api/remedios", remedioRoutes);
 app.use("/api/clinicas", clinicaRoutes);
 app.use("/api/especialidades", especialidadeRoutes);

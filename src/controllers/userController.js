@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Appointment = require("../models/Appointment");
 const Medication = require("../models/Medication");
+const PreTriage = require("../models/PreTriage");
 const { formatUser, formatMedicoPublico } = require("../config/format");
 const { dataValida } = require("../config/datas");
 const { idValido, conferirEspecialidade, conferirClinicas, buscaPorTexto } = require("../config/vinculos");
@@ -18,10 +19,13 @@ const CAMPOS_SAUDE = ["condicoes_saude", "alergias", "medicamentos_em_uso"];
 async function excluirContaEmCascata(user) {
   if (user.tipo === "paciente") {
     await Medication.deleteMany({ paciente: user._id });
+    // Histórico realizado nunca pode voltar a ser horário disponível.
+    await Appointment.deleteMany({ paciente: user._id, status: "realizada" });
     await Appointment.updateMany(
-      { paciente: user._id },
-      { $set: { paciente: null, status: "disponivel", ...ANAMNESE_VAZIA } }
+      { paciente: user._id, status: "agendada" },
+      { $set: { paciente: null, status: "disponivel", pre_triagem: null, ...ANAMNESE_VAZIA } }
     );
+    await PreTriage.deleteMany({ paciente: user._id });
   }
   if (user.tipo === "medico") {
     await Medication.deleteMany({ medico: user._id });

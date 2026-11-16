@@ -16,7 +16,7 @@ const populada = (query) => query
 const ehDono = (id, req) => id && id.toString() === req.user.id;
  
 async function list(req, res) {
-  const filtro = {};
+  const filtro = { status: { $in: ["disponivel", "agendada"] } };
   if (req.user.tipo === "paciente") {
     filtro.paciente = req.user.id;
     filtro.status = "agendada";
@@ -270,16 +270,30 @@ async function cancelar(req, res) {
   res.json({ message: "Consulta cancelada com sucesso." });
 }
  
-async function realizada(req, res) {
-  const c = await Appointment.findOne({ _id: req.params.id, medico: req.user.id });
-  if (!c) return res.status(404).json({ message: "Consulta não encontrada." });
-  if (c.status !== "agendada") {
-    return res.status(400).json({ message: "Só uma consulta agendada pode ser marcada como realizada." });
-  }
-  await c.deleteOne();
-  res.json({ message: "Consulta realizada. Os remédios receitados continuam com o paciente." });
+async function historico(req, res) {
+  const filtro = { status: "realizada" };
+  if (req.user.tipo === "paciente") filtro.paciente = req.user.id;
+  if (req.user.tipo === "medico") filtro.medico = req.user.id;
+  const consultas = await populada(Appointment.find(filtro)
+    .sort({ data_consulta: -1, horario_consulta: -1 }).limit(100));
+  res.json(consultas.map(c => formatConsulta(c, { comAnamnese: req.user.tipo !== "administrador" })));
 }
- 
+
+async function realizada(req, res) {
+  const c = await Appointment.findOneAndUpdate(
+    { _id: req.params.id, medico: req.user.id, status: "agendada" },
+    { $set: { status: "realizada", realizada_em: new Date() } },
+    { new: true }
+  );
+  if (!c) {
+    const existe = await Appointment.exists({ _id: req.params.id, medico: req.user.id });
+    return res.status(existe ? 409 : 404).json({ message: existe
+      ? "Só uma consulta agendada pode ser marcada como realizada."
+      : "Consulta não encontrada." });
+  }
+  res.json({ message: "Consulta realizada e mantida no histórico; os remédios continuam vinculados.", id: c._id });
+}
+
 async function avisoVisto(req, res) {
   const c = await Appointment.findOneAndUpdate(
     { _id: req.params.id, medico: req.user.id },
@@ -302,4 +316,4 @@ async function remove(req, res) {
   res.json({ message: "Consulta excluída com sucesso." });
 }
  
-module.exports = { list, disponiveis, meusPacientes, getById, create, agendar, trocar, avisoVisto, realizada, cancelar, remove };
+module.exports = { list, disponiveis, meusPacientes, getById, create, agendar, trocar, avisoVisto, realizada, historico, cancelar, remove };

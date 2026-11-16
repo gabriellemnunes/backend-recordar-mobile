@@ -60,6 +60,7 @@ function formatConsulta(c, { comAnamnese = false } = {}) {
   const saida = {
     id: c._id,
     status: c.status,
+    realizada_em: c.realizada_em || null,
     data_consulta: c.data_consulta,
     horario_consulta: c.horario_consulta,
     id_clinica: cl ? cl._id : null,

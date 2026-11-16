@@ -9,6 +9,7 @@ router.use(authenticate);
 router.get("/", h(controller.list));
 router.get("/disponiveis", authorize("paciente"), h(controller.disponiveis));
 router.get("/meus-pacientes", authorize("medico"), h(controller.meusPacientes));
+router.get("/historico", h(controller.historico));
 router.get("/:id", h(controller.getById));
 
 router.post("/", authorize("medico"), h(controller.create));

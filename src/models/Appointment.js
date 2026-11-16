@@ -6,8 +6,9 @@ const appointmentSchema = new mongoose.Schema({
   paciente: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   data_consulta: { type: String, required: true },
   horario_consulta: { type: String, required: true },
-  status: { type: String, enum: ["disponivel", "agendada"], default: "disponivel" },
+  status: { type: String, enum: ["disponivel", "agendada", "realizada"], default: "disponivel" },
 
+  realizada_em: { type: Date, default: null },
   pre_triagem: { type: mongoose.Schema.Types.ObjectId, ref: "PreTriage", default: null },
   queixa_principal: { type: String, default: "" },
   sintomas: { type: String, default: "" },
