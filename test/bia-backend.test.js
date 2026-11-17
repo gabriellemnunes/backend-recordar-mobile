@@ -100,3 +100,49 @@ test('excluir paciente remove histÃ³rico e prÃ©-triagem em vez de liberar co
   assert.equal(await Appointment.countDocuments({ status: 'realizada' }), 0);
   assert.equal(await PreTriage.countDocuments({ paciente: paciente.id }), 0);
 });
+
+test('foto do perfil persiste somente na própria conta e aceita remoção', async () => {
+  const foto = 'data:image/jpeg;base64,' + Buffer.from([255,216,255,224,0,2,255,217]).toString('base64');
+  const saved = await request(app).put('/api/users/me').set('Authorization', bearer(paciente)).send({ foto_perfil: foto });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.foto_perfil, foto);
+  assert.equal((await request(app).get('/api/users/me').set('Authorization', bearer(paciente))).body.foto_perfil, foto);
+  assert.equal((await request(app).get('/api/users/me').set('Authorization', bearer(outro))).body.foto_perfil, null);
+  const invalid = await request(app).put('/api/users/me').set('Authorization', bearer(paciente)).send({ foto_perfil: 'data:image/svg+xml;base64,PHN2Zz4=' });
+  assert.equal(invalid.status, 400);
+  assert.equal((await User.findById(paciente.id)).foto_perfil, foto);
+  assert.equal((await request(app).put('/api/users/me').set('Authorization', bearer(paciente)).send({ foto_perfil: null })).status, 200);
+  assert.equal((await User.findById(paciente.id)).foto_perfil, null);
+});
+
+test('foto não aceita imagem acima do limite e exige autenticação', async () => {
+  assert.equal((await request(app).put('/api/users/me').send({ foto_perfil: null })).status, 401);
+  const huge = 'data:image/jpeg;base64,' + 'A'.repeat(280001);
+  assert.equal((await request(app).put('/api/users/me').set('Authorization', bearer(paciente)).send({ foto_perfil: huge })).status, 400);
+});
+
+test('conta de paciente não obtém acesso de administrador alterando tipo ou token', async () => {
+  const bcrypt = require('bcryptjs');
+  await User.updateOne({ _id: paciente.id }, { senha: await bcrypt.hash('Teste123!', 10) });
+  const login = await request(app).post('/api/auth/login').send({ email: paciente.email, senha: 'Teste123!', tipo: 'administrador' });
+  assert.equal(login.status, 403);
+  assert.equal(login.body.token, undefined);
+  assert.equal((await request(app).get('/api/users').set('Authorization', bearer(paciente))).status, 403);
+  const token = jwt.sign({ id: paciente.id, tipo: 'administrador' }, process.env.JWT_SECRET);
+  assert.equal((await request(app).get('/api/users').set('Authorization', `Bearer ${token}`)).status, 403);
+  assert.equal((await request(app).post('/api/auth/register').send({ tipo: 'administrador', email: 'adm@teste.com', senha: 'Teste123!' })).status, 403);
+});
+
+test('demonstração tem perfil com foto, agenda, histórico e medicamentos registrados', async () => {
+  const demo = await require('../scripts/seed-demo')(new Date('2026-11-17T15:00:00Z'));
+  assert.equal(demo.patient.nome_usuario, 'Maria Helena Santos');
+  assert.match(demo.patient.foto_perfil, /^data:image\/jpeg;base64,/);
+  assert.ok(Buffer.from(demo.patient.foto_perfil.split(',')[1], 'base64').length <= 200 * 1024);
+  assert.equal(await Medication.countDocuments({ paciente: demo.patient.id }), 3);
+  assert.equal(await Appointment.countDocuments({ paciente: demo.patient.id, status: 'agendada' }), 2);
+  assert.equal(await Appointment.countDocuments({ paciente: demo.patient.id, status: 'realizada' }), 1);
+  assert.equal(await Appointment.countDocuments({ medico: demo.doctor.id, status: 'disponivel' }), 19);
+  const meds = await Medication.find({ paciente: demo.patient.id }).sort({ horario_remedio: 1 });
+  assert.equal(meds[0].dias_tomados[0], '2026-11-17');
+  assert.equal(demo.admin.tipo, 'administrador');
+});
