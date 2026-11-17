@@ -5,6 +5,7 @@ const Medication = require("../models/Medication");
 const PreTriage = require("../models/PreTriage");
 const { formatUser, formatMedicoPublico } = require("../config/format");
 const { dataValida } = require("../config/datas");
+const { validarFotoPerfil } = require("../config/fotoPerfil");
 const { idValido, conferirEspecialidade, conferirClinicas, buscaPorTexto } = require("../config/vinculos");
 const { erroHttp } = require("../middlewares/errorHandler");
 
@@ -102,6 +103,7 @@ async function create(req, res) {
 }
 
 async function aplicarEdicao(user, b, { podeTrocarSenha }) {
+  if (podeTrocarSenha && b.foto_perfil !== undefined) user.foto_perfil = validarFotoPerfil(b.foto_perfil);
   if (b.email !== undefined) {
     const email = String(b.email).toLowerCase().trim();
     if (!email) throw erroHttp(400, "email não pode ficar vazio.");
