@@ -7,6 +7,7 @@ function notFound(req, res) {
 }
 
 function errorHandler(error, req, res, next) {
+  if (error.type === "entity.too.large") return res.status(413).json({ message: "Arquivo muito grande. Escolha uma foto menor." });
   if (error.type === "entity.parse.failed") {
     return res.status(400).json({ message: "JSON inválido no corpo da requisição." });
   }
