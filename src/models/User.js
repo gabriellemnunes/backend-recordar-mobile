@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   senha: { type: String, required: true },
   telefone: { type: String, default: "", trim: true },
+  foto_perfil: { type: String, default: null },
 
   data_nascimento: { type: String, default: null },
   anamnese_preenchida: { type: Boolean, default: false },

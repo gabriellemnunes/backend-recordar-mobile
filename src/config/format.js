@@ -30,6 +30,8 @@ function formatMedicoPublico(u) {
 
 function formatUser(u, { comSaude = false } = {}) {
   const base = { id: u._id, tipo: u.tipo, email: u.email, telefone: u.telefone };
+  if (process.env.RECORDAR_DEMO === "1") base.demonstracao = true;
+  if (comSaude) base.foto_perfil = u.foto_perfil || null;
   if (u.tipo === "paciente") {
     const paciente = {
       ...base,

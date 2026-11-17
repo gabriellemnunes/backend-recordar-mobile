@@ -1,4 +1,11 @@
 module.exports = function extenderSwagger(spec) {
+  const perfil = spec.paths['/api/users/me'].put;
+  perfil.requestBody.content['application/json'].schema.properties.foto_perfil = {
+    type: 'string', nullable: true, maxLength: 280000,
+    description: 'Foto JPEG em data:image/jpeg;base64,..., até 200 KB. Envie null para remover. Disponível apenas nos dados da própria conta.'
+  };
+  perfil.responses['400'] = { description: 'Foto inválida ou maior que 200 KB' };
+  perfil.responses['413'] = { description: 'Corpo da requisição maior que 400 KB' };
   const busca = spec.paths['/api/consultas/disponiveis']?.get;
   if (busca) {
     busca.parameters = (busca.parameters || []).filter(p => p.name !== 'id_consulta_atual');
