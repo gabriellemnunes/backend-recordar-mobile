@@ -1,4 +1,11 @@
 module.exports = function extenderSwagger(spec) {
+  const busca = spec.paths['/api/consultas/disponiveis']?.get;
+  if (busca) {
+    busca.parameters = (busca.parameters || []).filter(p => p.name !== 'id_consulta_atual');
+    busca.parameters.push({ in: 'query', name: 'id_consulta_atual', schema: { type: 'string' },
+      description: 'ID da consulta própria a reagendar. Mantém o médico e a pré-triagem; desconsidera esta reserva ao filtrar conflitos.' });
+    busca.description = 'Retorna somente horários futuros, vinculados à clínica e sem conflitos com a agenda do paciente. A consulta atual é validada quando informada.';
+  }
   spec.info.version = '4.3.0';
   spec.info.description += ' Extensão de pré-triagem protegida e histórico de consultas realizadas.';
   spec.components.securitySchemes.aiServiceToken = {
