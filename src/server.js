@@ -24,7 +24,7 @@ const { criarAdminInicial } = require("./controllers/authController");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "400kb" }));
 
 app.get("/api", (req, res) => {
   res.json({ app: "Recordar", message: "API do Recordar funcionando!", version: "3.0.0" });
