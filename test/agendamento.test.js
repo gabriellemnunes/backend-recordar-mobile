@@ -126,3 +126,60 @@ test('troca move a prescriÃ§Ã£o sem alterar paciente ou mÃ©dico', async ()
   const saved = await Medication.findById(medication.id);
   assert.equal(String(saved.consulta), second.id); assert.equal(String(saved.paciente), p.id); assert.equal(String(saved.medico), m.id);
 });
+
+test('resultado da rota de IA usa id e chega vinculado ao historico', async () => {
+  process.env.AI_SERVICE_TOKEN = 'teste-gabi-integracao-ia-privado';
+  const created = await request(app).post('/api/pre-triagens')
+    .set('x-ai-service-token', process.env.AI_SERVICE_TOKEN)
+    .send({ paciente: p.id, especialidades: [specialty.id], resumo: 'Resumo de integracao',
+      sintomas: ['Sintoma ficticio'], duracao: 'dois dias', intensidade: 3, urgencia: false, concluida: true });
+  assert.equal(created.status, 201); assert.ok(created.body.id); assert.equal(created.body._id, undefined);
+  const available = await request(app).get(`/api/consultas/disponiveis?id_pre_triagem=${created.body.id}`).set('Authorization', token);
+  assert.equal(available.status, 200); assert.equal(available.body[0].id, slot.id);
+  const booked = await put(slot.id, 'agendar', { id_pre_triagem: created.body.id });
+  assert.equal(booked.status, 200); assert.equal(booked.body.id_pre_triagem, created.body.id);
+  assert.equal(booked.body.anamnese.sintomas, 'Sintoma ficticio');
+  assert.equal((await put(slot.id, 'realizada', {}, m)).status, 200);
+  const history = await request(app).get('/api/consultas/historico').set('Authorization', token);
+  assert.equal(history.body[0].id_pre_triagem, created.body.id);
+  assert.equal(history.body[0].status, 'realizada');
+  assert.equal((await put(slot.id, 'cancelar')).status, 409);
+  const current = await request(app).get('/api/consultas').set('Authorization', token);
+  assert.deepEqual(current.body, []);
+});
+
+test('disponibilidade nao oferece conflito com outro medico ou com o mesmo profissional no dia', async () => {
+  await put(slot.id, 'agendar', { queixa_principal: 'Motivo' });
+  await newSlot('12:00');
+  const m2 = await User.create({ tipo: 'medico', nome_usuario: 'Outro medico', email: 'disp@test.dev', senha: 'teste', clinicas: [clinic.id], especialidade: specialty.id });
+  await newSlot('11:00', { medico: m2.id });
+  const free = await newSlot('14:00', { medico: m2.id });
+  const r = await request(app).get('/api/consultas/disponiveis').set('Authorization', token);
+  assert.equal(r.status, 200); assert.deepEqual(r.body.map(c => c.id), [free.id]);
+});
+
+test('reagendamento permite outro horario no mesmo dia e exige consulta propria', async () => {
+  await put(slot.id, 'agendar', { id_pre_triagem: triage.id });
+  const second = await newSlot('12:00');
+  const r = await request(app).get(`/api/consultas/disponiveis?id_consulta_atual=${slot.id}`).set('Authorization', token);
+  assert.equal(r.status, 200); assert.deepEqual(r.body.map(c => c.id), [second.id]);
+  assert.equal((await request(app).get(`/api/consultas/disponiveis?id_consulta_atual=${slot.id}`).set('Authorization', auth(other))).status, 404);
+  const swapped = await put(slot.id, 'trocar', { id_nova: second.id });
+  assert.equal(swapped.status, 200); assert.equal(swapped.body.id_pre_triagem, triage.id);
+});
+
+test('reagendamento respeita especialidade persistida e nao reabre consulta realizada', async () => {
+  await put(slot.id, 'agendar', { id_pre_triagem: triage.id });
+  await newSlot('12:00');
+  m.especialidade = new mongoose.Types.ObjectId(); await m.save();
+  const r = await request(app).get(`/api/consultas/disponiveis?id_consulta_atual=${slot.id}`).set('Authorization', token);
+  assert.equal(r.status, 200); assert.deepEqual(r.body, []);
+  await put(slot.id, 'realizada', {}, m);
+  assert.equal((await request(app).get(`/api/consultas/disponiveis?id_consulta_atual=${slot.id}`).set('Authorization', token)).status, 404);
+});
+
+test('sintomas invalidos e datas futuras nao reservam horario', async () => {
+  assert.equal((await put(slot.id, 'agendar', { queixa_principal: 'Motivo', sintomas: {} })).status, 400);
+  assert.equal((await put(slot.id, 'agendar', { queixa_principal: 'Motivo', inicio_sintomas: '2099-01-01' })).status, 400);
+  assert.equal((await Appointment.findById(slot.id)).status, 'disponivel');
+});

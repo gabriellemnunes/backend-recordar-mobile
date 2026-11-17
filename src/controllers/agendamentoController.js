@@ -5,7 +5,7 @@ const PreTriage = require('../models/PreTriage');
 const User = require('../models/User');
 const { erroHttp } = require('../middlewares/errorHandler');
 const { formatConsulta } = require('../config/format');
-const { dataValida, horaValida } = require('../config/datas');
+const { hoje, dataValida, horaValida } = require('../config/datas');
 const { idValido } = require('../config/vinculos');
 function validarId(id) {
   if (typeof id !== 'string' || !idValido(id)) throw erroHttp(400, 'ID inválido.');
@@ -18,7 +18,7 @@ function instante(c) {
 function futuro(c) {
   if (instante(c) <= new Date()) throw erroHttp(409, 'Este horário já passou.');
 }
-const limpar = { paciente: null, status: 'disponivel', pre_triagem: null,
+const limpar = { paciente: null, status: 'disponivel', pre_triagem: null, realizada_em: null,
   queixa_principal: '', sintomas: '', inicio_sintomas: '', aviso_troca: false,
   troca_data_anterior: '', troca_horario_anterior: '' };
 
@@ -61,12 +61,16 @@ async function agendar(req, res) {
     const t = await triagem(req.body.id_pre_triagem, req.user.id, session);
     const queixa = String(req.body.queixa_principal || t?.resumo || '').trim();
     if (!queixa) throw erroHttp(400, 'Informe o motivo da consulta.');
+    const sintomas = req.body.sintomas === undefined ? (t?.sintomas || []).join(', ') : req.body.sintomas;
+    const inicio = req.body.inicio_sintomas ?? '';
+    if (typeof sintomas !== 'string' || sintomas.length > 6000 || queixa.length > 2000) throw erroHttp(400, 'Motivo ou sintomas inválidos.');
+    if (typeof inicio !== 'string' || (inicio && (!dataValida(inicio) || inicio > hoje()))) throw erroHttp(400, 'O início dos sintomas deve ser uma data válida que não esteja no futuro.');
     const c = await Appointment.findOne({ _id: req.params.id, status: 'disponivel' }).session(session);
     if (!c) throw erroHttp(409, 'Horário indisponível. Atualize a lista.');
     await validarDestino(c, t, session);
     await conflitos(c, req.user.id, session);
     Object.assign(c, { ...limpar, paciente: req.user.id, status: 'agendada', pre_triagem: t?._id || null,
-      queixa_principal: queixa, sintomas: String(req.body.sintomas || ''), inicio_sintomas: String(req.body.inicio_sintomas || '') });
+      queixa_principal: queixa, sintomas, inicio_sintomas: inicio });
     await c.save({ session });
     id = c._id;
   });
@@ -116,11 +120,17 @@ async function cancelar(req, res) {
   res.json({ message: 'Consulta cancelada com sucesso.' });
 }
 async function disponiveis(req, res) {
-  for (const key of ['id_pre_triagem', 'medico', 'clinica', 'especialidade']) {
+  for (const key of ['id_pre_triagem', 'id_consulta_atual', 'medico', 'clinica', 'especialidade']) {
     if (req.query[key] !== undefined) validarId(req.query[key]);
   }
-  const t = await triagem(req.query.id_pre_triagem, req.user.id, null);
-  const query = { status: 'disponivel' };
+  let atual = null;
+  if (req.query.id_consulta_atual) {
+    atual = await Appointment.findOne({ _id: req.query.id_consulta_atual, paciente: req.user.id, status: 'agendada' });
+    if (!atual) throw erroHttp(404, 'Consulta atual não encontrada.');
+    futuro(atual);
+  }
+  const t = await triagem(atual ? atual.pre_triagem : req.query.id_pre_triagem, req.user.id, null);
+  const query = { status: 'disponivel', data_consulta: { $gte: hoje() } };
   if (req.query.data) {
     if (!dataValida(req.query.data)) throw erroHttp(400, 'Data inválida.');
     query.data_consulta = req.query.data;
@@ -129,12 +139,18 @@ async function disponiveis(req, res) {
   const filtro = { tipo: 'medico' };
   if (t) filtro.especialidade = { $in: t.especialidades };
   else if (req.query.especialidade) filtro.especialidade = req.query.especialidade;
-  if (req.query.medico) filtro._id = req.query.medico;
+  if (atual) filtro._id = atual.medico;
+  else if (req.query.medico) filtro._id = req.query.medico;
   const medicos = await User.find(filtro).select('_id clinicas');
   query.medico = { $in: medicos.map(m => m._id) };
   const consultas = await Appointment.find(query).sort({ data_consulta: 1, horario_consulta: 1 })
     .populate({ path: 'medico', populate: { path: 'especialidade' } }).populate('clinica');
+  const ocupadas = await Appointment.find({ paciente: req.user.id, status: 'agendada',
+    ...(atual ? { _id: { $ne: atual._id } } : {}), data_consulta: { $gte: hoje() } })
+    .select('medico data_consulta horario_consulta');
   res.json(consultas.filter(c => instante(c) > new Date() && c.clinica &&
+    !ocupadas.some(o => o.data_consulta === c.data_consulta &&
+      (o.horario_consulta === c.horario_consulta || String(o.medico) === String(c.medico?._id))) &&
     medicos.find(m => String(m._id) === String(c.medico?._id))?.clinicas.some(id => String(id) === String(c.clinica._id)))
     .map(c => formatConsulta(c)));
 }

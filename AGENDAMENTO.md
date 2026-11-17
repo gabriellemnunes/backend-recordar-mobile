@@ -1,5 +1,13 @@
 # Integração do agendamento mobile
 
+## Revisão da Gabi em 17/11/2026
+
+Integração sobre os commits de Bia até `db93eb00d39f4707f95acb6dac30244ba457cb53`. A rota privada de escrita de IA e o histórico já implementados foram preservados. O retorno público de pré-triagem usa `id`; esse valor deve ser enviado em `id_pre_triagem` ao agendar. Quando o paciente omite sintomas no pedido, os sintomas persistidos da pré-triagem são utilizados. O início dos sintomas, se informado, deve ser uma data válida que não esteja no futuro.
+
+`GET /api/consultas/disponiveis` aceita agora `id_consulta_atual` para reagendamento. O servidor exige que a consulta esteja agendada, no futuro e pertença ao paciente. Usa o médico e a pré-triagem dessa consulta e exclui somente sua própria reserva da checagem de conflitos. As demais consultas do paciente continuam impedindo horários simultâneos e nova consulta com o mesmo profissional no mesmo dia. Consultas realizadas ficam no histórico e não são reabertas pelo reagendamento/cancelamento.
+
+A disponibilidade já oculta conflitos; a confirmação ainda revalida tudo dentro da transação. A revisão possui 25 testes de backend aprovados e 25 verificações de integração HTTP com o aplicativo.
+
 Base copiada de `gabriellemnunes/backend-recordar`, commit `40df654da45def501b4c153b621ef99539cb6a3a`.
 
 ## Contrato de pré-triagem
