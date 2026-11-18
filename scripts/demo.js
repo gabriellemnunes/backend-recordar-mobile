@@ -13,7 +13,7 @@ async function main() {
   const repl = await MongoMemoryReplSet.create({ instanceOpts: [{ dbPath }], replSet: { count: 1 }, binary: { version: '7.0.24', downloadDir: path.resolve('../../work/mongodb-binaries') } });
   await mongoose.connect(repl.getUri());
   await seedDemo();
-  const server = app.listen(3000, '127.0.0.1', () => console.log('DEMONSTRAÇÃO LOCAL: http://127.0.0.1:3000/api\nPaciente: paciente@demo.recordar\nMédico: medico@demo.recordar\nAdministrador: admin@demo.recordar\nSenha de todos: RecordarDemo123!\nDados e retrato fictícios. Banco temporário; os exemplos são recriados ao iniciar.'));
+  const server = app.listen(3000, '0.0.0.0', () => console.log('DEMONSTRAÇÃO LOCAL: http://127.0.0.1:3000/api\nPaciente: paciente@demo.recordar\nMédico: medico@demo.recordar\nAdministrador: admin@demo.recordar\nSenha de todos: RecordarDemo123!\nDados e retrato fictícios. Banco temporário; os exemplos são recriados ao iniciar.'));
   async function stop() { server.close(); await mongoose.disconnect(); await repl.stop(); process.exit(0); }
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
 }

@@ -69,7 +69,7 @@ async function start() {
 
   await criarAdminInicial();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Servidor em http://localhost:${PORT}`);
     console.log(`Swagger em http://localhost:${PORT}/api-docs`);
   });
