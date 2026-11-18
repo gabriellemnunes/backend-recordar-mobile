@@ -104,7 +104,23 @@ function situacaoRemedio(r, dia = hoje()) {
 }
 
 function formatRemedio(r, dia = hoje()) {
+  const registros = r.registros_tomadas || [];
+  const ativos = registros.filter(x => x.dia === dia && !x.corrigido_em);
+  const corrigidos = registros.filter(x => x.dia === dia && x.corrigido_em);
+  const legado = registros.length === 0 && ((r.dias_tomados || []).includes(dia) || r.tomado_em === dia);
+  const tomadas = ativos.length + (legado ? 1 : 0);
+  const limite = r.tomadas_por_dia || 1;
+  const ultimo = ativos[ativos.length - 1];
+  const proximo = ultimo && r.intervalo_minimo_minutos
+    ? new Date(new Date(ultimo.registrado_em).getTime() + r.intervalo_minimo_minutos * 60000).toISOString() : null;
   return {
+    tomadas_por_dia: limite,
+    intervalo_minimo_minutos: r.intervalo_minimo_minutos || 0,
+    tomadas_hoje: tomadas,
+    limite_atingido: tomadas >= limite,
+    marcacoes_por_engano_hoje: corrigidos.length,
+    ultimo_registro_id: ultimo ? String(ultimo._id) : null,
+    proximo_registro_em: proximo,
     id: r._id,
     nome_remedio: r.nome_remedio,
     horario_remedio: r.horario_remedio,
@@ -112,7 +128,7 @@ function formatRemedio(r, dia = hoje()) {
     data_inicio: r.data_inicio || null,
     data_fim: r.data_fim || null,
     situacao: situacaoRemedio(r),
-    tomado_hoje: (r.dias_tomados || []).includes(dia) || r.tomado_em === dia,
+    tomado_hoje: tomadas > 0,
     id_consulta: r.consulta,
     id_medico: r.medico ? r.medico._id : null,
     nome_medico: r.medico ? r.medico.nome_usuario : null,
