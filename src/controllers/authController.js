@@ -64,6 +64,11 @@ async function login(req, res) {
 }
 
 async function recuperarSenha(req, res) {
+  // Data de nascimento e CRM podem ser descobertos por terceiros. Este fluxo legado
+  // so deve existir em demonstracoes de desenvolvimento, nunca em producao.
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_INSECURE_PASSWORD_RECOVERY !== 'true') {
+    return res.status(403).json({ message: 'Recuperacao de senha indisponivel. Contate o suporte.' });
+  }
   const { tipo, email, data_nascimento, crm, nova_senha, confirmar_senha } = req.body;
 
   if (tipo !== "paciente" && tipo !== "medico") {

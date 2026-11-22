@@ -60,8 +60,12 @@ async function start() {
   }
 
   try {
-    await mongoose.connect(uri);
-    console.log("MongoDB do Recordar conectado!");
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
+    const status = await mongoose.connection.db.admin().command({ hello: 1 });
+    if (!status.setName && status.msg !== 'isdbgrid') {
+      throw new Error('MongoDB sem replica set/sharding: as transacoes de agendamento exigem Atlas ou replica set.');
+    }
+    console.log('MongoDB do Recordar conectado com suporte a transacoes!');
   } catch (error) {
     console.error("Erro ao conectar ao MongoDB:", error.message);
     process.exit(1);
