@@ -28,6 +28,49 @@ before(async () => {
   await Promise.all([User.init(), Appointment.init()]);
 });
 after(async () => { await mongoose.disconnect(); if (repl) await repl.stop(); });
+test('chat coleta dados, salva uma pre-triagem e isola conversas por paciente',async()=>{
+  const ai=require('../src/services/chatAI'); const original=ai.interpretar;
+  ai.interpretar=async()=>({sintomas:['dor no joelho'],especialidades:[especialidade.id],urgencia:false});
+  try {
+    const send=(body,u=paciente)=>request(app).post('/api/chat').set('Authorization',bearer(u)).send(body);
+    assert.equal((await send({mensagem:'dor no joelho'})).status,400);
+    const first=await send({mensagem:'dor no joelho',consentimento_ia:true});
+    assert.equal(first.status,200); const id=first.body.id_conversa;
+    assert.equal((await send({mensagem:'dois dias',id_conversa:id},outro)).status,404);
+    assert.equal((await send({mensagem:'dois dias',id_conversa:id})).body.etapa,'intensidade');
+    assert.equal((await send({mensagem:'100',id_conversa:id})).status,400);
+    await send({mensagem:'4',id_conversa:id});
+    const done=await send({mensagem:'não',id_conversa:id}); assert.equal(done.status,200); assert.ok(done.body.id_pre_triagem);
+    const saved=await PreTriage.findById(done.body.id_pre_triagem); assert.equal(saved.paciente.toString(),paciente.id);assert.equal(saved.intensidade,4); assert.equal(saved.duracao,'dois dias');
+    const repeated=await send({mensagem:'não',id_conversa:id}); assert.equal(repeated.body.id_pre_triagem,done.body.id_pre_triagem);
+    assert.equal(await PreTriage.countDocuments({conversa:id}),1);
+    assert.equal((await request(app).get('/api/chat/'+id).set('Authorization',bearer(outro))).status,404);
+    const history=await request(app).get('/api/chat/'+id).set('Authorization',bearer(paciente));assert.equal(history.body.mensagens.length,8);
+  } finally {ai.interpretar=original;}
+});
+test('chat de urgencia alerta e persiste mesmo sem IA disponivel',async()=>{
+ const ai=require('../src/services/chatAI'); const original=ai.interpretar;ai.interpretar=async()=>{throw Error('Não deve usar IA');};
+ try {
+  const result=await request(app).post('/api/chat').set('Authorization',bearer(paciente)).send({mensagem:'Estou com dor forte no peito e falta de ar',consentimento_ia:true});
+  assert.equal(result.status,200);assert.equal(result.body.urgencia,true);assert.match(result.body.resposta,/192/);
+  const t=await PreTriage.findById(result.body.id_pre_triagem);assert.equal(t.origem,'regra_seguranca');assert.deepEqual(t.especialidades,[]);
+ }finally{ai.interpretar=original;}
+});
+test('chat exige paciente autenticado e respeita bloqueio de processamento',async()=>{
+ assert.equal((await request(app).post('/api/chat').send({mensagem:'teste'})).status,401);
+ assert.equal((await request(app).post('/api/chat').set('Authorization',bearer(medico)).send({mensagem:'teste'})).status,403);
+ const c=await require('../src/models/ChatConversation').create({paciente:paciente.id,processando_ate:new Date(Date.now()+60000)});
+ assert.equal((await request(app).post('/api/chat').set('Authorization',bearer(paciente)).send({mensagem:'teste',id_conversa:c.id})).status,409);
+});
+test('falha da IA conserva etapa para tentar novamente sem fabricar resultado',async()=>{
+ const ai=require('../src/services/chatAI');const original=ai.interpretar;ai.interpretar=async()=>{throw require('../src/middlewares/errorHandler').erroHttp(503,'IA indisponível');};
+ try{
+ const c=await require('../src/models/ChatConversation').create({paciente:paciente.id,etapa:'complementos',sintomas_informados:'dor no joelho',duracao:'dois dias',intensidade:4});
+ const r=await request(app).post('/api/chat').set('Authorization',bearer(paciente)).send({mensagem:'não',id_conversa:c.id});assert.equal(r.status,503);
+ assert.equal(await PreTriage.countDocuments({conversa:c.id}),0);
+ assert.equal((await require('../src/models/ChatConversation').findById(c.id)).processando_ate,null);
+ }finally{ai.interpretar=original;}
+});
 beforeEach(async () => {
   await Promise.all(Object.values(mongoose.connection.collections).map((c) => c.deleteMany({})));
   especialidade = await Specialty.create({ nome_especialidade: 'ClÃ­nica mÃ©dica' });

@@ -27,6 +27,8 @@ async function excluirContaEmCascata(user) {
       { $set: { paciente: null, status: "disponivel", pre_triagem: null, ...ANAMNESE_VAZIA } }
     );
     await PreTriage.deleteMany({ paciente: user._id });
+    await require('../models/ChatConversation').deleteMany({paciente:user._id});
+    await require('../models/ChatQuota').deleteMany({chave:{$regex:'^'+user._id+':'}});
   }
   if (user.tipo === "medico") {
     await Medication.deleteMany({ medico: user._id });
