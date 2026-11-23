@@ -50,10 +50,15 @@ async function list(req, res) {
     return res.status(400).json({ message: "dia deve estar no formato AAAA-MM-DD." });
   }
 
-  let remedios = await populado(Medication.find(filtro).sort({ horario_remedio: 1, nome_remedio: 1 }));
   if (dia) {
-    remedios = remedios.filter((r) => situacaoRemedio(r, dia) === "em_uso");
-  } else {
+    filtro.$and = [
+      { $or: [{ data_inicio: { $lte: dia } }, { data_inicio: null }] },
+      { $or: [{ data_fim: { $gte: dia } }, { data_fim: null }, { data_fim: "" }] }
+    ];
+  }
+
+  const remedios = await populado(Medication.find(filtro).sort({ horario_remedio: 1, nome_remedio: 1 }));
+  if (!dia) {
     remedios.sort((a, b) => ORDEM_SITUACAO[situacaoRemedio(a)] - ORDEM_SITUACAO[situacaoRemedio(b)]);
   }
   res.json(remedios.map((r) => formatRemedio(r, dia || hoje())));

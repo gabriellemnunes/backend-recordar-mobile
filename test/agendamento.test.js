@@ -127,6 +127,24 @@ test('troca move a prescriÃ§Ã£o sem alterar paciente ou mÃ©dico', async ()
   assert.equal(String(saved.consulta), second.id); assert.equal(String(saved.paciente), p.id); assert.equal(String(saved.medico), m.id);
 });
 
+test('agenda inclui os limites da prescrição e exclui os dias fora do período', async () => {
+  const dados = { medico: m.id, nome_remedio: 'Medicamento fictício', horario_remedio: '08:00', quantidade_remedio: '1' };
+  const comPeriodo = await Medication.create({ ...dados, paciente: p.id, data_inicio: '2026-11-23', data_fim: '2026-11-26' });
+  const semPeriodo = await Medication.create({ ...dados, paciente: p.id, data_fim: '' });
+  await Medication.create({ ...dados, paciente: other.id });
+
+  for (const [dia, ids] of [
+    ['2026-11-22', [semPeriodo.id]],
+    ['2026-11-23', [comPeriodo.id, semPeriodo.id]],
+    ['2026-11-26', [comPeriodo.id, semPeriodo.id]],
+    ['2026-11-28', [semPeriodo.id]],
+  ]) {
+    const resposta = await request(app).get('/api/remedios').query({ dia }).set('Authorization', token);
+    assert.equal(resposta.status, 200);
+    assert.deepEqual(resposta.body.map((r) => r.id).sort(), ids.sort());
+  }
+});
+
 test('resultado da rota de IA usa id e chega vinculado ao historico', async () => {
   process.env.AI_SERVICE_TOKEN = 'teste-gabi-integracao-ia-privado';
   const created = await request(app).post('/api/pre-triagens')
