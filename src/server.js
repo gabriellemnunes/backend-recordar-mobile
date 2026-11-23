@@ -34,6 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/consultas", consultaRoutes);
 app.use("/api/pre-triagens", require("./routes/preTriagemRoutes"));
+app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/remedios", remedioRoutes);
 app.use("/api/clinicas", clinicaRoutes);
 app.use("/api/especialidades", especialidadeRoutes);

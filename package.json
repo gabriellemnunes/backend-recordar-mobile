@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node --test --test-concurrency=1",
-    "demo": "node scripts/demo.js"
+    "demo": "node scripts/demo.js",
+    "ai:local": "node scripts/start-ai-local.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
