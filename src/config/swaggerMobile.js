@@ -64,5 +64,7 @@ module.exports = function extenderSwagger(spec) {
       responses: { 200: { description: 'Lista de consultas realizadas' }, 401: { description: 'Não autenticado' } }
     }
   };
+  spec.paths['/api/chat']={post:{tags:['Chatbot'],summary:'Coleta sintomas e conclui pré-triagem com IA',security:[{bearerAuth:[]}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['mensagem'],properties:{mensagem:{type:'string',maxLength:2000},id_conversa:{type:'string',nullable:true},consentimento_ia:{type:'boolean',description:'Obrigatório ao iniciar conversa.'}}}}}},responses:{200:{description:'Resposta, id_conversa, etapa, urgencia e id_pre_triagem quando concluída'},400:{description:'Mensagem ou etapa inválida'},401:{description:'Não autenticado'},403:{description:'Somente pacientes'},409:{description:'Mensagem anterior em processamento'},429:{description:'Limite de mensagens por hora'},503:{description:'IA indisponível; nenhum resultado inventado'}}}};
+  spec.paths['/api/chat/{id}']={get:{tags:['Chatbot'],summary:'Recupera conversa do próprio paciente',security:[{bearerAuth:[]}],parameters:[{in:'path',name:'id',required:true,schema:{type:'string'}}],responses:{200:{description:'Mensagens e resultado persistidos'},404:{description:'Conversa não encontrada ou de outro paciente'}}}};
   return spec;
 };
