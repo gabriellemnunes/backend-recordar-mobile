@@ -70,6 +70,28 @@ async function interpretar(dados, catalogo, fetcher = fetch) {
         },
       },
     };
+  } else if (provider === "groq") {
+    if (!process.env.GROQ_API_KEY?.trim())
+      throw erroHttp(
+        503,
+        "A IA ainda não foi configurada no servidor. Você pode agendar diretamente.",
+      );
+    url = "https://api.groq.com/openai/v1/chat/completions";
+    headers.Authorization = "Bearer " + process.env.GROQ_API_KEY.trim();
+    body = {
+      model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+      stream: false,
+      reasoning_effort: "low",
+      max_completion_tokens: 800,
+      messages: [
+        { role: "system", content: prompt },
+        { role: "user", content: JSON.stringify(dados) },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "pre_triagem", strict: true, schema },
+      },
+    };
   } else if (provider === "ollama") {
     url =
       (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "") +
@@ -101,15 +123,16 @@ async function interpretar(dados, catalogo, fetcher = fetch) {
     });
     if (!response.ok) throw Error("provider");
     const result = await response.json();
-    const content =
-      provider === "ollama"
-        ? result.message?.content
-        : result.output
-            ?.filter((x) => x.type === "message")
-            .flatMap((x) => x.content || [])
-            .filter((x) => x.type === "output_text")
-            .map((x) => x.text)
-            .join("");
+    let content = result.message?.content;
+    if (provider === "groq") content = result.choices?.[0]?.message?.content;
+    if (provider === "openai") {
+      content = result.output
+        ?.filter((x) => x.type === "message")
+        .flatMap((x) => x.content || [])
+        .filter((x) => x.type === "output_text")
+        .map((x) => x.text)
+        .join("");
+    }
     const parsed = JSON.parse(content);
     const allowed = new Set(catalogo.map((x) => String(x._id)));
     if (

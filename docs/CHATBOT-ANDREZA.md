@@ -28,6 +28,10 @@ Nesta máquina, os caminhos portáteis foram configurados exclusivamente no `.en
 
 O APK usa `EXPO_PUBLIC_API_URL` com o endereço acessível da API e `EXPO_PUBLIC_CHAT_PATH=/chat`. Nunca colocar segredos ou `OLLAMA_URL` dentro do app. Na mesma rede, usar o IP do computador; `127.0.0.1` no celular é o próprio celular. Fora da rede, publicar backend e Ollama em infraestrutura adequada, com HTTPS no backend e autenticação. Não abrir a porta do Ollama diretamente na internet. Modelo gratuito não significa servidor gratuito.
 
+## Demonstração no Render com Groq
+
+No serviço do backend, configure `AI_PROVIDER=groq`, `GROQ_MODEL=openai/gpt-oss-20b` e adicione `GROQ_API_KEY` como segredo. Mantenha a conta no plano gratuito e use contas e relatos fictícios na demonstração. O Groq processa o texto do chat e a resposta continua sujeita à validação de especialidades do backend. O APK usa a mesma URL da API do Render.
+
 ## OpenAI opcional
 
 `AI_PROVIDER=openai`, `OPENAI_API_KEY` e `OPENAI_MODEL` permitem usar Responses API com JSON estruturado e `store:false`. É cobrada por uso. A chave fica só no backend. Antes de habilitar um provedor externo, atualizar a informação de privacidade e a autorização ao paciente para identificar o destinatário das mensagens.
