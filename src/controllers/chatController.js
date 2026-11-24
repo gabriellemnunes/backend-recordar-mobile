@@ -6,6 +6,7 @@ const PreTriage = require("../models/PreTriage");
 const Specialty = require("../models/Specialty");
 const ai = require("../services/chatAI");
 const { erroHttp } = require("../middlewares/errorHandler");
+const resumoMaximo = PreTriage.schema.path("resumo").options.maxlength;
 const questions = {
   duracao: "Há quanto tempo você está sentindo isso?",
   intensidade:
@@ -25,7 +26,14 @@ function resposta(c) {
   };
 }
 async function resultado(c, output, source) {
-  const summary = `Sintomas informados: ${output.sintomas.join(", ")}. Duração: ${c.duracao || "não informada"}. Intensidade: ${c.intensidade ?? "não informada"}.`;
+  const prefixo = "Sintomas informados: ";
+  const sufixo = `. Duração: ${c.duracao || "não informada"}. Intensidade: ${c.intensidade ?? "não informada"}.`;
+  const sintomas = output.sintomas.join(", ");
+  const limite = resumoMaximo - prefixo.length - sufixo.length;
+  const resumoSintomas = sintomas.length > limite
+    ? sintomas.slice(0, limite - 1).replace(/[\uD800-\uDBFF]$/, "").trimEnd() + "…"
+    : sintomas;
+  const summary = prefixo + resumoSintomas + sufixo;
   const triage = await PreTriage.findOneAndUpdate(
     { conversa: c._id },
     {

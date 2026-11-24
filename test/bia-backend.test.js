@@ -48,6 +48,19 @@ test('chat coleta dados, salva uma pre-triagem e isola conversas por paciente',a
     const history=await request(app).get('/api/chat/'+id).set('Authorization',bearer(paciente));assert.equal(history.body.mensagens.length,8);
   } finally {ai.interpretar=original;}
 });
+test('sinopse longa conserva os sintomas completos e cabe no resumo persistido', async (t) => {
+  const ai = require('../src/services/chatAI');
+  const Conversation = require('../src/models/ChatConversation');
+  const sintomas = Array.from({ length: 10 }, (_, i) => ('sintoma fictício ' + i + ' ').repeat(20).slice(0, 300));
+  t.mock.method(ai, 'interpretar', async () => ({ sintomas, especialidades: [especialidade.id], urgencia: false }));
+  const c = await Conversation.create({ paciente: paciente.id, etapa: 'complementos', duracao: 'dois dias', intensidade: 4 });
+  const resposta = await request(app).post('/api/chat').set('Authorization', bearer(paciente)).send({ mensagem: 'não', id_conversa: c.id });
+  assert.equal(resposta.status, 200);
+  const triagem = await PreTriage.findById(resposta.body.id_pre_triagem);
+  assert.deepEqual(triagem.sintomas, sintomas);
+  assert.ok(triagem.resumo.length <= 2000);
+  assert.match(triagem.resumo, /Duração: dois dias\. Intensidade: 4\.$/);
+});
 test('chat de urgencia alerta e persiste mesmo sem IA disponivel',async()=>{
  const ai=require('../src/services/chatAI'); const original=ai.interpretar;ai.interpretar=async()=>{throw Error('Não deve usar IA');};
  try {
