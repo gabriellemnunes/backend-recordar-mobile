@@ -151,11 +151,13 @@ async function enviar(req, res) {
       const catalog = await Specialty.find()
         .select("_id nome_especialidade")
         .limit(200);
-      if (!catalog.length)
+      if (!catalog.length) {
+        console.warn("[chat-triage]", { category: "empty_specialty_catalog", status: 503 });
         throw erroHttp(
           503,
           "Não há especialidades cadastradas para concluir a pré-triagem.",
         );
+      }
       const output = await ai.interpretar(
         {
           sintomas: c.sintomas_informados,

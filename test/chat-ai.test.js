@@ -89,3 +89,74 @@ test("Groq autentica, solicita JSON estruturado e valida as especialidades", asy
   delete process.env.GROQ_API_KEY;
   await assert.rejects(interpretar(dados, catalogo, fake), { httpStatus: 503 });
 });
+
+test("Groq repete falhas transitórias e registra apenas metadados", async (t) => {
+  const env = process.env;
+  process.env = { ...env, AI_PROVIDER: "groq", GROQ_API_KEY: "chave-ficticia" };
+  t.after(() => { process.env = env; });
+  const log = t.mock.method(console, "warn", () => {});
+  const catalogo = [{ _id: "real" }];
+  const valid = { sintomas: ["relato fictício"], especialidades: ["real"], urgencia: false };
+  const completion = (content, finish_reason = "stop") =>
+    Response.json({ choices: [{ finish_reason, message: { content } }] });
+  let calls = 0;
+  const result = await interpretar(valid, catalogo, async () => {
+    calls++;
+    if (calls === 1) return new Response("mensagem privada", { status: 503 });
+    if (calls === 2) throw new TypeError("segredo em erro de rede");
+    return completion(JSON.stringify(valid));
+  });
+  assert.deepEqual(result, valid);
+  assert.equal(calls, 3);
+  assert.deepEqual(log.mock.calls.map((c) => c.arguments[1]), [
+    { provider: "groq", category: "upstream_unavailable", status: 503, attempt: 1, retry: true },
+    { provider: "groq", category: "network", status: null, attempt: 2, retry: true },
+  ]);
+
+  process.env.CHAT_TIMEOUT_MS = "1000";
+  for (const [response, category] of [
+    [new Response(null, { status: 429, headers: { "Retry-After": "10" } }), "rate_limit"],
+    [new Response(null, { status: 401 }), "authentication"],
+    [completion("{"), "invalid_json"],
+    [completion(JSON.stringify({ ...valid, prescricao: "campo não permitido" })), "invalid_schema"],
+    [completion(JSON.stringify(valid), "length"), "incomplete_response"],
+  ]) {
+    calls = 0;
+    await assert.rejects(interpretar(valid, catalogo, async () => {
+      calls++;
+      return response;
+    }), { httpStatus: 503 });
+    assert.equal(calls, 1);
+    assert.equal(log.mock.calls.at(-1).arguments[1].category, category);
+  }
+
+  calls = 0;
+  await assert.rejects(interpretar(valid, catalogo, async (_url, { signal }) => {
+    calls++;
+    return {
+      ok: true,
+      status: 200,
+      json: () => require("node:timers/promises").setTimeout(2000, valid, { signal }),
+    };
+  }), { httpStatus: 503 });
+  assert.equal(calls, 1);
+  assert.deepEqual(log.mock.calls.at(-1).arguments[1], {
+    provider: "groq", category: "timeout", status: 200, attempt: 1, retry: false,
+  });
+
+  process.env.GROQ_MODEL = " URL inválida ";
+  await assert.rejects(interpretar(valid, catalogo, async () => {
+    assert.fail("modelo inválido chegou à rede");
+  }), { httpStatus: 503 });
+  assert.equal(log.mock.calls.at(-1).arguments[1].category, "invalid_model");
+
+  process.env.GROQ_MODEL = " llama-3.1-8b-instant ";
+  let request;
+  await interpretar(valid, catalogo, async (_url, options) => {
+    request = JSON.parse(options.body);
+    return completion(JSON.stringify(valid));
+  });
+  assert.equal(request.model, "llama-3.1-8b-instant");
+  assert.deepEqual(request.response_format, { type: "json_object" });
+  assert.equal(request.reasoning_effort, undefined);
+});
